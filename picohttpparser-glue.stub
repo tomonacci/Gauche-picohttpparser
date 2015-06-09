@@ -47,7 +47,7 @@ void Scm_Init_picohttpparser_glue(ScmModule*);
 
 "#define substring(start, len) Scm_MakeString(SCM_U8VECTOR_ELEMENTS(request->buf) + ((start) - (const char *)SCM_U8VECTOR_ELEMENTS(buf)), (len), -1, 0)"
 
-(define-cproc phr-parse-request (buf::<u8vector> :optional (len::<int> (c "SCM_MAKE_INT(SCM_VECTOR_SIZE(buf))")) (last_len::<int> 0))
+(define-cproc phr-parse-request (buf::<u8vector> :optional (len::<int> (c "SCM_MAKE_INT(SCM_U8VECTOR_SIZE(buf))")) (last_len::<int> 0))
   (let* ((method::(const char *))
          (method_len::size_t)
          (path::(const char *))
@@ -103,7 +103,7 @@ void Scm_Init_picohttpparser_glue(ScmModule*);
 
 "#define substring(start, len) Scm_MakeString(SCM_U8VECTOR_ELEMENTS(response->buf) + ((start) - (const char *)SCM_U8VECTOR_ELEMENTS(buf)), (len), -1, 0)"
 
-(define-cproc phr-parse-response (buf::<u8vector> :optional (len::<int> (c "SCM_MAKE_INT(SCM_VECTOR_SIZE(buf))")) (last_len::<int> 0))
+(define-cproc phr-parse-response (buf::<u8vector> :optional (len::<int> (c "SCM_MAKE_INT(SCM_U8VECTOR_SIZE(buf))")) (last_len::<int> 0))
   (let* ((minor_version::int)
          (status::int)
          (msg::(const char *))
