@@ -48,22 +48,18 @@ void Scm_Init_picohttpparser_glue(ScmModule*);
 "#define substring(start, len) Scm_MakeString(buf_to + ((start) - buf_from), (len), -1, 0)"
 (define-cfn prepare_headers (buf_from::(const char*) buf_to::(const char*) headers::(struct phr_header*) num_headers::size_t) :static
   (when (not num_headers) (return SCM_NIL))
-  (let* ((h::(struct phr_header))
-         (hp::(struct phr_header*))
-         (initial_pair::ScmPair)
-         (i::int)
-         (p (SCM_OBJ (& initial_pair)))
+  (let* ((initial_pair::ScmPair) ; result will be in the cdr of this pair
+         (p (SCM_OBJ (& initial_pair))) ; points to the pair at the end of the (non-null) alist that we are building
          (tmp)
-         (multiline_count::int 0)
-         (multiline_size::int (ref (aref headers 0) value_len))
+         (multiline_count::int 0) ; number of trailing lines that current header field has
+         (multiline_size::int (ref (aref headers 0) value_len)) ; size of current header field in bytes
          )
-    (set! (SCM_CDR (& initial_pair)) SCM_NIL)
-    (set! (ref (aref headers num_headers) name_len) 1)
+    (set! (ref (aref headers num_headers) name_len) 1) ; sentinel -- forces flushing of the last header field
     (dotimes (i num_headers)
       (if (ref (aref headers (+ i 1)) name_len)
-        (begin
+        (begin ; flush pending field
           (if (not multiline_count)
-            (begin
+            (begin ; materialize single-line header field
               (set! tmp
                 (Scm_Cons
                  (Scm_Cons
@@ -73,14 +69,16 @@ void Scm_Init_picohttpparser_glue(ScmModule*);
               (set! (SCM_CDR p) tmp)
               (set! p tmp)
               )
-            (begin
+            (begin ; we are dealing with a multi-line header field -- join the lines and grow the alist
+              ; "join the lines" part is an adaptation of Scm_ListToString in Gauche (src/string.c)
               (let* ((multiline_buf::char* (SCM_NEW_ATOMIC2 (.type char*) (+ multiline_size 1)))
-                     (multiline_bufp::char* multiline_buf))
-                (for ((set! hp (+ headers (- i multiline_count)))
-                      (not (== hp (+ headers i 1)))
-                      (pre++ hp))
-                  (memcpy multiline_bufp (-> hp value) (-> hp value_len))
-                  (+= multiline_bufp (-> hp value_len)))
+                     (multiline_bufp::char* multiline_buf)
+                     (h::(struct phr_header*)))
+                (for ((set! h (+ headers (- i multiline_count)))
+                      (not (== h (+ headers i 1)))
+                      (inc! h))
+                  (memcpy multiline_bufp (-> h value) (-> h value_len))
+                  (+= multiline_bufp (-> h value_len)))
                 (set! multiline_bufp 0)
                 (set! tmp
                   (Scm_Cons
@@ -96,7 +94,7 @@ void Scm_Init_picohttpparser_glue(ScmModule*);
           (set! multiline_count 0)
           (set! multiline_size (ref (aref headers (+ i 1)) value_len))
           )
-        (begin
+        (begin ; second/third/fourth/... of a multi-line header field
           (inc! multiline_count)
           (+= multiline_size (ref (aref headers (+ i 1)) value_len))
           )))
