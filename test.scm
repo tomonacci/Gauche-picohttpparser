@@ -10,10 +10,6 @@
 (use picohttpparser)
 (test-module 'picohttpparser)
 
-(test* "ev-io-new" #t (is-a? (ev-io-new) <ev-io-watcher>))
-(test* "ev-default-loop" #t (is-a? (ev-default-loop 0) <ev-loop>))
-(test* "ev-loop-new" #t (is-a? (ev-loop-new 0) <ev-loop>))
-(test* "constants" #t (and (integer? EV_READ) (integer? EV_WRITE)))
 (test* "phr-parse-request" #t
   (let1 request (phr-parse-request (string->u8vector (file->string "request.txt")))
     ;(set! (ref request'method) "POST")
