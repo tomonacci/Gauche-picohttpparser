@@ -2,3 +2,4 @@ Makefile
 *.log
 *.gpd
 *.so
+VERSION
