@@ -16,6 +16,16 @@ typedef struct ScmPhrRequestRec {
   ScmObj buf, method, path, minor_version, headers;
 } ScmPhrRequest;
 
+SCM_CLASS_DECL(Scm_PhrResponseClass);
+#define SCM_CLASS_PHR_RESPONSE (&Scm_PhrResponseClass)
+#define SCM_PHR_RESPONSE(obj) ((ScmPhrResponse*)(obj))
+#define SCM_PHR_RESPONSEP(obj) (SCM_XTYPEP(obj, SCM_CLASS_PHR_RESPONSE))
+
+typedef struct ScmPhrResponseRec {
+  SCM_HEADER;
+  ScmObj buf, minor_version, status, msg, headers;
+} ScmPhrResponse;
+
 void Scm_Init_picohttpparser_glue(ScmModule*);
 "
 
@@ -24,6 +34,14 @@ void Scm_Init_picohttpparser_glue(ScmModule*);
    (method :type <top> :setter #f)
    (path :type <top> :setter #f)
    (minor-version :type <top> :setter #f)
+   (headers :type <top> :setter #f)
+   ))
+
+(define-cclass <phr-response> "ScmPhrResponse*" "Scm_PhrResponseClass" ()
+  ((buf :type <top> :setter #f)
+   (minor-version :type <top> :setter #f)
+   (status :type <top> :setter #f)
+   (msg :type <top> :setter #f)
    (headers :type <top> :setter #f)
    ))
 
@@ -77,6 +95,61 @@ void Scm_Init_picohttpparser_glue(ScmModule*);
         (set! (-> request headers) (SCM_CDR (& initial_pair)))
         )
       (return (SCM_OBJ request)))
+    (unless (== header_len -2)
+      (Scm_Error "parse error"))
+    (return SCM_FALSE)))
+
+"#undef substring"
+
+"#define substring(start, len) Scm_MakeString(SCM_U8VECTOR_ELEMENTS(response->buf) + ((start) - (const char *)SCM_U8VECTOR_ELEMENTS(buf)), (len), -1, 0)"
+
+(define-cproc phr-parse-response (buf::<u8vector> :optional (len::<int> (c "SCM_MAKE_INT(SCM_VECTOR_SIZE(buf))")) (last_len::<int> 0))
+  (let* ((minor_version::int)
+         (status::int)
+         (msg::(const char *))
+         (msg_len::size_t)
+         (headers::(.array (struct phr_header) (100)))
+         (num_headers::size_t 100)
+         (response::ScmPhrResponse* NULL)
+         (header_len::int)
+         )
+    (set! header_len
+      (phr_parse_response
+       (SCM_U8VECTOR_ELEMENTS buf) len
+       (& minor_version)
+       (& status)
+       (& msg) (& msg_len)
+       headers (& num_headers)
+       last_len
+       ))
+    (when (>= header_len 0)
+      (set! response (SCM_NEW ScmPhrResponse))
+      (SCM_SET_CLASS response SCM_CLASS_PHR_RESPONSE)
+      (set! (-> response buf) (Scm_U8VectorCopy buf 0 header_len))
+      (set! (-> (SCM_UVECTOR (-> response buf)) immutable) 1)
+      (set! (-> response minor_version) (SCM_MAKE_INT minor_version))
+      (set! (-> response status) (SCM_MAKE_INT status))
+      (set! (-> response msg) (substring msg msg_len))
+      (let* ((h::(struct phr_header))
+             (initial_pair::ScmPair)
+             (p (SCM_OBJ (& initial_pair)))
+             (tmp)
+             )
+        (set! (SCM_CDR (& initial_pair)) SCM_NIL)
+        (dotimes (i num_headers)
+          (set! h (aref headers i))
+          (set! tmp
+            (Scm_Cons
+             (Scm_Cons
+              (substring (ref h name) (ref h name_len))
+              (substring (ref h value) (ref h value_len)))
+             SCM_NIL))
+          (set! (SCM_CDR p) tmp)
+          (set! p tmp)
+          )
+        (set! (-> response headers) (SCM_CDR (& initial_pair)))
+        )
+      (return (SCM_OBJ response)))
     (unless (== header_len -2)
       (Scm_Error "parse error"))
     (return SCM_FALSE)))

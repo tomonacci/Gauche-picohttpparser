@@ -6,6 +6,8 @@
   (use gauche.uvector)
   (export <phr-request>
           phr-parse-request
+          <phr-response>
+          phr-parse-response
           )
   )
 (select-module picohttpparser)
