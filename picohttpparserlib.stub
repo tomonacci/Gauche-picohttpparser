@@ -1,0 +1,170 @@
+;;;
+;;; picohttpparserlib.stub
+;;;
+
+"
+#include <stdio.h>
+#include <gauche.h>
+#include <gauche/extend.h>
+#include <gauche/class.h>
+#include <gauche/uvector.h>
+#include <ev.h>
+#include \"picohttpparser.h\"
+
+ScmClass *EvLoopClass, *EvIoWatcherClass;
+
+#define EV_LOOP_P(obj) SCM_XTYPEP(obj, EvLoopClass)
+#define EV_LOOP_UNBOX(obj) SCM_FOREIGN_POINTER_REF(struct ev_loop*, obj)
+#define EV_LOOP_BOX(ptr) Scm_MakeForeignPointer(EvLoopClass, ptr)
+
+#define EV_IO_WATCHER_P(obj) SCM_XTYPEP(obj, EvIoWatcherClass)
+#define EV_IO_WATCHER_UNBOX(obj) SCM_FOREIGN_POINTER_REF(struct ev_io*, obj)
+#define EV_IO_WATCHER_BOX(ptr) Scm_MakeForeignPointer(EvIoWatcherClass, ptr)
+
+SCM_CLASS_DECL(Scm_PhrRequestClass);
+#define SCM_CLASS_PHR_REQUEST (&Scm_PhrRequestClass)
+#define SCM_PHR_REQUEST(obj) ((ScmPhrRequest*)(obj))
+#define SCM_PHR_REQUESTP(obj) (SCM_XTYPEP(obj, SCM_CLASS_PHR_REQUEST))
+
+typedef struct ScmPhrRequestRec {
+  SCM_HEADER;
+  ScmObj buf, method, path, minor_version, headers;
+} ScmPhrRequest;
+
+void Scm_Init_picohttpparserlib(ScmModule*);
+"
+
+(define-type <ev-loop> "struct ev_loop*" "ev-loop"
+  "EV_LOOP_P" "EV_LOOP_UNBOX" "EV_LOOP_BOX")
+
+(define-type <ev-io-watcher> "struct ev_io*" "ev-io-watcher"
+  "EV_IO_WATCHER_P" "EV_IO_WATCHER_UNBOX" "EV_IO_WATCHER_BOX")
+
+(define-cclass <phr-request> "ScmPhrRequest*" "Scm_PhrRequestClass" ()
+  ((buf :type <top> :setter #f)
+   (method :type <top> :setter #f)
+   (path :type <top> :setter #f)
+   (minor-version :type <top> :setter #f)
+   (headers :type <top> :setter #f)
+   ))
+
+"#define substring(start, len) Scm_MakeString(SCM_U8VECTOR_ELEMENTS(request->buf) + ((start) - (const char *)SCM_U8VECTOR_ELEMENTS(buf)), (len), -1, 0)"
+
+(define-cproc phr-parse-request (buf::<u8vector> :optional (len::<int> (c "SCM_MAKE_INT(SCM_VECTOR_SIZE(buf))")) (last_len::<int> 0))
+  (let* ((method::(const char *))
+         (method_len::size_t)
+         (path::(const char *))
+         (path_len::size_t)
+         (minor_version::int)
+         (headers::(.array (struct phr_header) (100)))
+         (num_headers::size_t 100)
+         (request::ScmPhrRequest* NULL)
+         (header_len::int)
+         )
+    (set! header_len
+      (phr_parse_request
+       (SCM_U8VECTOR_ELEMENTS buf) len
+       (& method) (& method_len)
+       (& path) (& path_len)
+       (& minor_version)
+       headers (& num_headers)
+       last_len
+       ))
+    (when (>= header_len 0)
+      (set! request (SCM_NEW ScmPhrRequest))
+      (SCM_SET_CLASS request SCM_CLASS_PHR_REQUEST)
+      (set! (-> request buf) (Scm_U8VectorCopy buf 0 header_len))
+      (set! (-> (SCM_UVECTOR (-> request buf)) immutable) 1)
+      (set! (-> request method) (substring method method_len))
+      (set! (-> request path) (substring path path_len))
+      (set! (-> request minor_version) (SCM_MAKE_INT minor_version))
+      (let* ((h::(struct phr_header))
+             (initial_pair::ScmPair)
+             (p (SCM_OBJ (& initial_pair)))
+             (tmp)
+             )
+        (set! (SCM_CDR (& initial_pair)) SCM_NIL)
+        (dotimes (i num_headers)
+          (set! h (aref headers i))
+          (set! tmp
+            (Scm_Cons
+             (Scm_Cons
+              (substring (ref h name) (ref h name_len))
+              (substring (ref h value) (ref h value_len)))
+             SCM_NIL))
+          (set! (SCM_CDR p) tmp)
+          (set! p tmp)
+          )
+        (set! (-> request headers) (SCM_CDR (& initial_pair)))
+        )
+      (return (SCM_OBJ request)))
+    (unless (== header_len -2)
+      (Scm_Error "parse error"))
+    (return SCM_FALSE)))
+
+"#undef substring"
+
+(define-cproc ev-run (loop::<ev-loop>)::<void>
+  (ev_run loop 0)
+  )
+
+(define-cproc ev-loop-new (flags::<uint>)::<ev-loop>
+  (let* ((loop::(struct ev_loop*) (ev_loop_new flags)))
+    (return loop))
+  )
+
+(define-cproc ev-default-loop (flags::<uint>)::<ev-loop>
+  (return (ev_default_loop flags)))
+
+(define-cfn io_cb (loop::(struct ev_loop*) w::(struct ev_io*) revents::int)::void :static
+  (Scm_ApplyRec3 (-> w data) (EV_LOOP_BOX loop) (EV_IO_WATCHER_BOX w) (SCM_MAKE_INT revents))
+  )
+
+(define-cproc ev-io-new ()::<ev-io-watcher>
+  (let* ((w::(struct ev_io*) (malloc (sizeof (struct ev_io))))
+         )
+    (return w)
+    )
+  )
+
+(define-cproc ev-io-init (w::<ev-io-watcher> callback fd::<int> events::<int>)::<void>
+  (set! (-> w data) callback)
+  (ev_io_init w io_cb fd events)
+  )
+
+(define-cproc ev-io-start (loop::<ev-loop> w::<ev-io-watcher>)::<void>
+  (ev_io_start loop w)
+  )
+
+(define-cproc ev-io-stop (loop::<ev-loop> w::<ev-io-watcher>)::<void>
+  (ev_io_stop loop w)
+  )
+
+(define-cfn ev_io_watcher_print (obj out::ScmPort* ctx::ScmWriteContext*)::void
+  (Scm_Printf out "#<ev-io-watcher %p>" obj)
+  )
+
+(define-cfn ev_io_watcher_cleanup (obj)::void
+  ; Should take care of this:
+  ;   http://lists.schmorp.de/pipermail/libev/2014q4/002462.html
+  (free (EV_IO_WATCHER_UNBOX obj))
+  )
+
+(define-constant EV_READ (c "SCM_MAKE_INT(EV_READ)"))
+(define-constant EV_WRITE (c "SCM_MAKE_INT(EV_WRITE)"))
+
+(define-cfn Scm_Init_picohttpparser ()::void
+  (let* ((mod::ScmModule*))
+    (SCM_INIT_EXTENSION picohttpparser)
+    (set! mod (SCM_MODULE (SCM_FIND_MODULE "picohttpparser" TRUE)))
+    (set! EvLoopClass
+      (Scm_MakeForeignPointerClass
+       mod "<ev-loop>" NULL NULL
+       (logior SCM_FOREIGN_POINTER_KEEP_IDENTITY SCM_FOREIGN_POINTER_MAP_NULL)))
+    (set! EvIoWatcherClass
+      (Scm_MakeForeignPointerClass
+       mod "<ev-io-watcher>"
+       ev_io_watcher_print ev_io_watcher_cleanup
+       (logior SCM_FOREIGN_POINTER_KEEP_IDENTITY SCM_FOREIGN_POINTER_MAP_NULL)))
+    (Scm_Init_picohttpparserlib mod)
+    ))
