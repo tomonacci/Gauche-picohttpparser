@@ -27,6 +27,8 @@ typedef struct ScmPhrResponseRec {
 } ScmPhrResponse;
 
 void Scm_Init_picohttpparser_glue(ScmModule*);
+
+#define check_max_num_headers() if (max_num_headers < 0) Scm_Error(\"max-num-headers must be nonnegative, but got %S\", max_num_headers_scm); else
 "
 
 (define-cclass <phr-request> "ScmPhrRequest*" "Scm_PhrRequestClass" ()
@@ -103,14 +105,15 @@ void Scm_Init_picohttpparser_glue(ScmModule*);
 "#undef substring"
 
 "#define substring(start, len) Scm_MakeString(SCM_U8VECTOR_ELEMENTS(request->buf) + ((start) - (const char *)SCM_U8VECTOR_ELEMENTS(buf)), (len), -1, 0)"
-(define-cproc phr-parse-request (buf::<u8vector> :optional (len::<int> (c "SCM_MAKE_INT(SCM_U8VECTOR_SIZE(buf))")) (last_len::<int> 0))
+(define-cproc %phr-parse-request (buf::<u8vector> len::<int> last_len::<int> max_num_headers::<int>)
+  (check_max_num_headers)
   (let* ((method::(const char *))
          (method_len::size_t)
          (path::(const char *))
          (path_len::size_t)
          (minor_version::int)
-         (headers::(.array (struct phr_header) (101)))
-         (num_headers::size_t 100)
+         (headers::(.array (struct phr_header) ((+ max_num_headers 1))))
+         (num_headers::size_t max_num_headers)
          (request::ScmPhrRequest* NULL)
          (header_len::int)
          )
@@ -143,13 +146,14 @@ void Scm_Init_picohttpparser_glue(ScmModule*);
 "#undef substring"
 
 "#define substring(start, len) Scm_MakeString(SCM_U8VECTOR_ELEMENTS(response->buf) + ((start) - (const char *)SCM_U8VECTOR_ELEMENTS(buf)), (len), -1, 0)"
-(define-cproc phr-parse-response (buf::<u8vector> :optional (len::<int> (c "SCM_MAKE_INT(SCM_U8VECTOR_SIZE(buf))")) (last_len::<int> 0))
+(define-cproc %phr-parse-response (buf::<u8vector> len::<int> last_len::<int> max_num_headers::<int>)
+  (check_max_num_headers)
   (let* ((minor_version::int)
          (status::int)
          (msg::(const char *))
          (msg_len::size_t)
-         (headers::(.array (struct phr_header) (101)))
-         (num_headers::size_t 100)
+         (headers::(.array (struct phr_header) ((+ max_num_headers 1))))
+         (num_headers::size_t max_num_headers)
          (response::ScmPhrResponse* NULL)
          (header_len::int)
          )

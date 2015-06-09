@@ -36,9 +36,13 @@
     ("Accept-Encoding" . "gzip, deflate, sdch") ("Accept-Language" . "en-US,en;q=0.8,ja;q=0.6"))
   (~ *request*'headers))
 (test* "phr-parse-request (incomplete)" #f (phr-parse-request (string->u8vector "GET")))
-(test* "phr-parse-request (error)" "parse error"
+(test* "phr-parse-request (parse error)" "parse error"
   (guard (e (else (~ e'message)))
     (phr-parse-response (string->u8vector "Host"))
+    #f))
+(test* "phr-parse-request (argument error)" "max-num-headers must be nonnegative, but got -2"
+  (guard (e (else (~ e'message)))
+    (phr-parse-request #u8() 0 0 -2)
     #f))
 (test* "phr-parse-request (multi-line header)" '(("User-Agent" . "Mozilla/5.0 (X11; Linux i686)"))
   (~ (phr-parse-request (string->u8vector "GET / HTTP/1.1\r\nUser-Agent: Mozilla/5.0\r\n (X11; Linux i686)\r\n\r\n"))'headers))
@@ -63,9 +67,13 @@
   '(("Connection" . "close") ("Date" . "Thu, 01 Jan 1970 00:00:00 GMT") ("Content-Type" . "text/html") ("Content-Length" . "18"))
   (~ *response*'headers))
 (test* "phr-parse-response (incomplete)" #f (phr-parse-response (string->u8vector "HTTP/1.1 200")))
-(test* "phr-parse-response (error)" "parse error"
+(test* "phr-parse-response (parse error)" "parse error"
   (guard (e (else (~ e'message)))
     (phr-parse-response (string->u8vector "HTTP/1.1 OK"))
+    #f))
+(test* "phr-parse-response (argument error)" "max-num-headers must be nonnegative, but got -32"
+  (guard (e (else (~ e'message)))
+    (phr-parse-response #u8() 0 0 -32)
     #f))
 (test* "phr-parse-response (multi-line header)" '(("Connection" . " close") ("Content-Length" . "0"))
   (~ (phr-parse-response (string->u8vector "HTTP/1.1 403 Forbidden\r\nConnection:\r\n close\r\nContent-Length: 0\r\n\r\n"))'headers))
