@@ -67,6 +67,8 @@
   (guard (e (else (~ e'message)))
     (phr-parse-response (string->u8vector "HTTP/1.1 OK"))
     #f))
+(test* "phr-parse-response (multi-line header)" '(("Connection" . " close") ("Content-Length" . "0"))
+  (~ (phr-parse-response (string->u8vector "HTTP/1.1 403 Forbidden\r\nConnection:\r\n close\r\nContent-Length: 0\r\n\r\n"))'headers))
 
 ;; If you don't want `gosh' to exit with nonzero status even if
 ;; the test fails, pass #f to :exit-on-failure.
