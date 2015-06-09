@@ -2,24 +2,38 @@
 ;;; Test picohttpparser
 ;;;
 
-(use file.util)
 (use gauche.test)
-(use gauche.uvector)
+(use gauche.uvector :only (string->u8vector))
 
 (test-start "picohttpparser")
 (use picohttpparser)
 (test-module 'picohttpparser)
 
-(define *response* #f)
+(define *request* (undefined))
+(define *response* (undefined))
 
 (test-section "phr-parse-request")
 (test* "phr-parse-request" #t
-  (let1 request (phr-parse-request (string->u8vector (file->string "request.txt")))
-    ;(set! (ref request'method) "POST")
-    ;(print (ref request'method))
-    (and (is-a? request <phr-request>) (equal? (ref request'method) "GET") (equal? (ref request'path) "/") (equal? (ref request'minor-version) 1))
-    ))
-(test* "phr-parse-request" #f (phr-parse-request (string->u8vector "")))
+  (begin
+    (set! *request*
+      ($ phr-parse-request $ string->u8vector
+       "GET / HTTP/1.1\r\n\
+        Host: localhost:4567\r\n\
+        Connection: keep-alive\r\n\
+        Cache-Control: max-age=0\r\n\
+        Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n\
+        User-Agent: Mozilla/5.0 (X11; Linux i686) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.81 Safari/537.36\r\n\
+        Accept-Encoding: gzip, deflate, sdch\r\n\
+        Accept-Language: en-US,en;q=0.8,ja;q=0.6\r\n\r\n"))
+    (is-a? *request* <phr-request>)))
+(test* "phr-parse-request (method)" "GET" (~ *request*'method))
+(test* "phr-parse-request (path)" "/" (~ *request*'path))
+(test* "phr-parse-request (minor-version)" 1 (~ *request*'minor-version))
+(test* "phr-parse-request (incomplete)" #f (phr-parse-request (string->u8vector "GET")))
+(test* "phr-parse-request (error)" "parse error"
+  (guard (e (else (~ e'message)))
+    (phr-parse-response (string->u8vector "Host"))
+    #f))
 
 (test-section "phr-parse-response")
 (test* "phr-parse-response" #t
