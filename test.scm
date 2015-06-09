@@ -40,6 +40,8 @@
   (guard (e (else (~ e'message)))
     (phr-parse-response (string->u8vector "Host"))
     #f))
+(test* "phr-parse-request (multi-line header)" '(("User-Agent" . "Mozilla/5.0 (X11; Linux i686)"))
+  (~ (phr-parse-request (string->u8vector "GET / HTTP/1.1\r\nUser-Agent: Mozilla/5.0\r\n (X11; Linux i686)\r\n\r\n"))'headers))
 
 (test-section "phr-parse-response")
 (test* "phr-parse-response" #t
