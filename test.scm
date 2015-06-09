@@ -15,7 +15,7 @@
 (test* "ev-loop-new" #t (is-a? (ev-loop-new 0) <ev-loop>))
 (test* "constants" #t (and (integer? EV_READ) (integer? EV_WRITE)))
 (test* "phr-parse-request" #t
-  (let1 request (phr-parse-request (string->u8vector (file->string "../request.txt")))
+  (let1 request (phr-parse-request (string->u8vector (file->string "request.txt")))
     ;(set! (ref request'method) "POST")
     ;(print (ref request'method))
     (and (is-a? request <phr-request>) (equal? (ref request'method) "GET") (equal? (ref request'path) "/") (equal? (ref request'minor-version) 1))
