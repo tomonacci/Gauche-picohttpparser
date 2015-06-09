@@ -29,6 +29,12 @@
 (test* "phr-parse-request (method)" "GET" (~ *request*'method))
 (test* "phr-parse-request (path)" "/" (~ *request*'path))
 (test* "phr-parse-request (minor-version)" 1 (~ *request*'minor-version))
+(test* "phr-parse-response (headers)"
+  '(("Host" . "localhost:4567") ("Connection" . "keep-alive") ("Cache-Control" . "max-age=0")
+    ("Accept" . "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+    ("User-Agent" . "Mozilla/5.0 (X11; Linux i686) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.81 Safari/537.36")
+    ("Accept-Encoding" . "gzip, deflate, sdch") ("Accept-Language" . "en-US,en;q=0.8,ja;q=0.6"))
+  (~ *request*'headers))
 (test* "phr-parse-request (incomplete)" #f (phr-parse-request (string->u8vector "GET")))
 (test* "phr-parse-request (error)" "parse error"
   (guard (e (else (~ e'message)))
